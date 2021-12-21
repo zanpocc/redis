@@ -6184,6 +6184,8 @@ int main(int argc, char **argv) {
 #ifdef INIT_SETPROCTITLE_REPLACEMENT
     spt_init(argc, argv);
 #endif
+
+    printf("Redis开始启动\n");
     setlocale(LC_COLLATE,"");
     tzset(); /* Populates 'timezone' global. */
     zmalloc_set_oom_handler(redisOutOfMemoryHandler);

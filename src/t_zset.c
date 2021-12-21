@@ -68,6 +68,7 @@ int zslLexValueLteMax(sds value, zlexrangespec *spec);
 
 /* Create a skiplist node with the specified number of levels.
  * The SDS string 'ele' is referenced by the node after the call. */
+// 创建一个跳表节点
 zskiplistNode *zslCreateNode(int level, double score, sds ele) {
     zskiplistNode *zn =
         zmalloc(sizeof(*zn)+level*sizeof(struct zskiplistLevel));
@@ -77,13 +78,16 @@ zskiplistNode *zslCreateNode(int level, double score, sds ele) {
 }
 
 /* Create a new skiplist. */
+// 创建一个跳表
 zskiplist *zslCreate(void) {
     int j;
     zskiplist *zsl;
 
+    // 申请内存
     zsl = zmalloc(sizeof(*zsl));
     zsl->level = 1;
     zsl->length = 0;
+    // 哨兵节点
     zsl->header = zslCreateNode(ZSKIPLIST_MAXLEVEL,0,NULL);
     for (j = 0; j < ZSKIPLIST_MAXLEVEL; j++) {
         zsl->header->level[j].forward = NULL;
@@ -119,6 +123,10 @@ void zslFree(zskiplist *zsl) {
  * The return value of this function is between 1 and ZSKIPLIST_MAXLEVEL
  * (both inclusive), with a powerlaw-alike distribution where higher
  * levels are less likely to be returned. */
+/*
+ * 为我们将要创建的新跳表节点返回一个随机级别。
+ * 此函数的返回值介于 1 和 ZSKIPLIST_MAXLEVEL 之间（两者都包含），具有类似幂律的分布，其中更高水平返回的可能性较小。
+ */
 int zslRandomLevel(void) {
     int level = 1;
     while ((random()&0xFFFF) < (ZSKIPLIST_P * 0xFFFF))
@@ -129,15 +137,22 @@ int zslRandomLevel(void) {
 /* Insert a new node in the skiplist. Assumes the element does not already
  * exist (up to the caller to enforce that). The skiplist takes ownership
  * of the passed SDS string 'ele'. */
+// 插入一个新节点到跳表，假设元素并不存在
 zskiplistNode *zslInsert(zskiplist *zsl, double score, sds ele) {
     zskiplistNode *update[ZSKIPLIST_MAXLEVEL], *x;
+
     unsigned int rank[ZSKIPLIST_MAXLEVEL];
     int i, level;
 
     serverAssert(!isnan(score));
+
+    // 头节点
     x = zsl->header;
+
+    // 层级遍历,上 -> 下
     for (i = zsl->level-1; i >= 0; i--) {
         /* store rank that is crossed to reach the insert position */
+        // 保存
         rank[i] = i == (zsl->level-1) ? 0 : rank[i+1];
         while (x->level[i].forward &&
                 (x->level[i].forward->score < score ||
@@ -153,6 +168,13 @@ zskiplistNode *zslInsert(zskiplist *zsl, double score, sds ele) {
      * scores, reinserting the same element should never happen since the
      * caller of zslInsert() should test in the hash table if the element is
      * already inside or not. */
+    /*
+     * 我们假设元素不在里面，因为我们允许重复分数，重新插入相同的元素不应该发生，
+     * 因为zslInsert() 的调用者应该在哈希表中测试元素是否为已经在里面与否
+     *
+     */
+
+    // 随机一个层级
     level = zslRandomLevel();
     if (level > zsl->level) {
         for (i = zsl->level; i < level; i++) {
@@ -162,7 +184,11 @@ zskiplistNode *zslInsert(zskiplist *zsl, double score, sds ele) {
         }
         zsl->level = level;
     }
+
+    // 创建一个Node节点
     x = zslCreateNode(level,score,ele);
+
+
     for (i = 0; i < level; i++) {
         x->level[i].forward = update[i]->level[i].forward;
         update[i]->level[i].forward = x;
