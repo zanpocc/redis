@@ -3357,7 +3357,7 @@ void initServer(void) {
  * see: https://sourceware.org/bugzilla/show_bug.cgi?id=19329 */
 void InitServerLast() {
     bioInit();
-    initThreadedIO();
+    initThreadedIO(); // 网络初始化
     set_jemalloc_bg_thread(server.jemalloc_bg_thread);
     server.initial_memory_usage = zmalloc_used_memory();
 }
@@ -6182,6 +6182,7 @@ int main(int argc, char **argv) {
 
     /* We need to initialize our libraries, and the server configuration. */
 #ifdef INIT_SETPROCTITLE_REPLACEMENT
+    printf("INIT_SETPROCTITLE_REPLACEMENT\n");
     spt_init(argc, argv);
 #endif
 
@@ -6342,7 +6343,7 @@ int main(int argc, char **argv) {
         moduleInitModulesSystemLast();
         moduleLoadFromQueue();
         ACLLoadUsersAtStartup();
-        InitServerLast();
+        InitServerLast(); // 网络初始化
         loadDataFromDisk();
         if (server.cluster_enabled) {
             if (verifyClusterConfigWithData() == C_ERR) {

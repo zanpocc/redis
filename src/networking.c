@@ -2134,6 +2134,8 @@ void readQueryFromClient(connection *conn) {
 
     /* Check if we want to read from the client later when exiting from
      * the event loop. This is the case if threaded I/O is enabled. */
+
+    // 检查是否开启了多线程，如果是则把 client 加入异步队列之后返回。
     if (postponeClientRead(c)) return;
 
     /* Update total number of reads on server */
@@ -3454,12 +3456,16 @@ void *IOThreadMain(void *myid) {
     }
 }
 
+/**
+ * 需要在配置文件中配置IO线程的数量
+ * io-threads 4
+ * io-threads-do-reads yes
+ */
 /* Initialize the data structures needed for threaded I/O. */
 void initThreadedIO(void) {
     server.io_threads_active = 0; /* We start with threads not active. */
 
-    /* Don't spawn any thread if the user selected a single thread:
-     * we'll handle I/O directly from the main thread. */
+    // 如果用户只配置了一个 I/O 线程，则不会创建新线程（效率低），直接在主线程里处理 I/O。
     if (server.io_threads_num == 1) return;
 
     if (server.io_threads_num > IO_THREADS_MAX_NUM) {
@@ -3468,17 +3474,21 @@ void initThreadedIO(void) {
         exit(1);
     }
 
-    /* Spawn and initialize the I/O threads. */
+    // 根据用户配置的 I/O 线程数，启动线程。
     for (int i = 0; i < server.io_threads_num; i++) {
-        /* Things we do for all the threads including the main thread. */
+        // 初始化 I/O 线程的本地任务队列。
         io_threads_list[i] = listCreate();
-        if (i == 0) continue; /* Thread 0 is the main thread. */
+        if (i == 0) continue; // 线程 0 是主线程。
 
-        /* Things we do only for the additional threads. */
+        // 初始化 I/O 线程并启动。
         pthread_t tid;
+        // 每个 I/O 线程会分配一个本地锁，用来休眠和唤醒线程。
         pthread_mutex_init(&io_threads_mutex[i],NULL);
+        // 每个 I/O 线程分配一个原子计数器，用来记录当前遗留的任务数量。
         setIOPendingCount(i, 0);
+        // 主线程在启动 I/O 线程的时候会默认先锁住它，直到有 I/O 任务才唤醒它。
         pthread_mutex_lock(&io_threads_mutex[i]); /* Thread will be stopped. */
+        // 启动线程，进入 I/O 线程的主逻辑函数 IOThreadMain。
         if (pthread_create(&tid,NULL,IOThreadMain,(void*)(long)i) != 0) {
             serverLog(LL_WARNING,"Fatal: Can't initialize IO thread.");
             exit(1);
@@ -3629,11 +3639,15 @@ int handleClientsWithPendingWritesUsingThreads(void) {
  * As a side effect of calling this function the client is put in the
  * pending read clients and flagged as such. */
 int postponeClientRead(client *c) {
+
+    // 当多线程 I/O 模式开启、主线程没有在处理阻塞任务时，将 client 加入异步队列。
     if (server.io_threads_active &&
         server.io_threads_do_reads &&
         !ProcessingEventsWhileBlocked &&
         !(c->flags & (CLIENT_MASTER|CLIENT_SLAVE|CLIENT_PENDING_READ)))
     {
+        // 给 client 打上 CLIENT_PENDING_READ 标识，表示该 client 需要被多线程处理，
+        // 后续在 I/O 线程中会在读取和解析完客户端命令之后判断该标识并放弃执行命令，让主线程去执行。
         c->flags |= CLIENT_PENDING_READ;
         listAddNodeHead(server.clients_pending_read,c);
         return 1;
@@ -3653,7 +3667,8 @@ int handleClientsWithPendingReadsUsingThreads(void) {
     int processed = listLength(server.clients_pending_read);
     if (processed == 0) return 0;
 
-    /* Distribute the clients across N different lists. */
+    // 遍历待读取的 client 队列 clients_pending_read，
+    // 通过 RR 轮询均匀地分配给 I/O 线程和主线程自己（编号 0）。
     listIter li;
     listNode *ln;
     listRewind(server.clients_pending_read,&li);
