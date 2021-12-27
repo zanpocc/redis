@@ -46,7 +46,7 @@
 #include <limits.h>
 #include <math.h>
 
-#include <hiredis.h>
+
 #ifdef USE_OPENSSL
 #include <openssl/ssl.h>
 #include <openssl/err.h>

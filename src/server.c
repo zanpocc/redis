@@ -2344,6 +2344,23 @@ extern int ProcessingEventsWhileBlocked;
  *
  * The most important is freeClientsInAsyncFreeQueue but we also
  * call some other low-risk functions. */
+
+/**
+ * 每次 Redis 进入时都会调用此函数
+ * 事件驱动库的主循环，即睡觉前
+ * 用于准备好的文件描述符。
+ *
+ * 注意：此函数（当前）从两个地方调用：
+ * 1. aeMain - 主服务器循环
+ * 2. processEventsWhileBlocked - 在 RDB/AOF 加载期间处理客户端
+ *
+ * 如果它是从 processEventsWhileBlocked 调用的，我们不想要
+ * 执行所有操作（例如，我们不想过期
+ * 键），但我们确实需要执行一些操作。
+ *
+ * 最重要的是 freeClientsInAsyncFreeQueue 但我们也
+ * 调用其他一些低风险函数。
+ */
 void beforeSleep(struct aeEventLoop *eventLoop) {
     UNUSED(eventLoop);
 
@@ -2997,12 +3014,23 @@ void closeSocketListeners(socketFds *sfd) {
 
 /* Create an event handler for accepting new connections in TCP or TLS domain sockets.
  * This works atomically for all socket fds */
+
+/**
+ * 创建一个事件处理程序以接受 TCP 或 TLS 域套接字中的新连接。
+ * 这适用于所有套接字 fds
+ *
+ * sfd: 文件描述符
+ * accept_handler: 处理函数
+ */
 int createSocketAcceptHandler(socketFds *sfd, aeFileProc *accept_handler) {
     int j;
 
+    // 每一个绑定本机网口的fd
     for (j = 0; j < sfd->count; j++) {
+        //
         if (aeCreateFileEvent(server.el, sfd->fd[j], AE_READABLE, accept_handler,NULL) == AE_ERR) {
             /* Rollback */
+            // 错误回滚
             for (j = j-1; j >= 0; j--) aeDeleteFileEvent(server.el, sfd->fd[j], AE_READABLE);
             return C_ERR;
         }
@@ -3181,6 +3209,8 @@ void initServer(void) {
     adjustOpenFilesLimit();
     const char *clk_msg = monotonicInit();
     serverLog(LL_NOTICE, "monotonic clock: %s", clk_msg);
+
+    // event的大小就是epoll的event数组大小,创建只是做一些初始化操作
     server.el = aeCreateEventLoop(server.maxclients+CONFIG_FDSET_INCR);
     if (server.el == NULL) {
         serverLog(LL_WARNING,
@@ -3190,7 +3220,7 @@ void initServer(void) {
     }
     server.db = zmalloc(sizeof(redisDb)*server.dbnum);
 
-    /* Open the TCP listening socket for the user commands. */
+    // 绑定和监听本机IP:端口,监听的socket文件描述符放在server.ipfd里面了
     if (server.port != 0 &&
         listenToPort(server.port,&server.ipfd) == C_ERR) {
         serverLog(LL_WARNING, "Failed listening on port %u (TCP), aborting.", server.port);
@@ -3288,6 +3318,12 @@ void initServer(void) {
     /* Create the timer callback, this is our way to process many background
      * operations incrementally, like clients timeout, eviction of unaccessed
      * expired keys and so forth. */
+
+    /**
+     * 创建定时器回调，这是我们处理很多后台的方式
+     * 增量操作，如客户端超时、驱逐未访问
+     * 过期的密钥等等。
+     */
     if (aeCreateTimeEvent(server.el, 1, serverCron, NULL, NULL) == AE_ERR) {
         serverPanic("Can't create event loop timers.");
         exit(1);
@@ -3295,6 +3331,10 @@ void initServer(void) {
 
     /* Create an event handler for accepting new connections in TCP and Unix
      * domain sockets. */
+
+    /**
+     * 创建一个事件处理程序以在 TCP 和 Unix 中接受新连接域套接字。
+     */
     if (createSocketAcceptHandler(&server.ipfd, acceptTcpHandler) != C_OK) {
         serverPanic("Unrecoverable error creating TCP socket accept handler.");
     }
@@ -3307,6 +3347,10 @@ void initServer(void) {
 
     /* Register a readable event for the pipe used to awake the event loop
      * when a blocked client in a module needs attention. */
+    /**
+     * 为用于唤醒事件循环的管道注册可读事件
+     * 当模块中被阻止的客户端需要注意时
+     */
     if (aeCreateFileEvent(server.el, server.module_blocked_pipe[0], AE_READABLE,
         moduleBlockedClientPipeReadable,NULL) == AE_ERR) {
             serverPanic(
@@ -3316,6 +3360,10 @@ void initServer(void) {
 
     /* Register before and after sleep handlers (note this needs to be done
      * before loading persistence since it is used by processEventsWhileBlocked. */
+    /**
+     * 在睡眠处理程序之前和之后注册（注意这需要完成
+     * 在加载持久性之前，因为它被 processEventsWhileBlocked 使用。
+     */
     aeSetBeforeSleepProc(server.el,beforeSleep);
     aeSetAfterSleepProc(server.el,afterSleep);
 
@@ -3340,7 +3388,9 @@ void initServer(void) {
         server.maxmemory_policy = MAXMEMORY_NO_EVICTION;
     }
 
+    // 集群模式
     if (server.cluster_enabled) clusterInit();
+
     replicationScriptCacheInit();
     scriptingInit(1);
     slowlogInit();
@@ -6383,6 +6433,7 @@ int main(int argc, char **argv) {
     redisSetCpuAffinity(server.server_cpulist);
     setOOMScoreAdj(-1);
 
+    // 事件循环
     aeMain(server.el);
     aeDeleteEventLoop(server.el);
     return 0;

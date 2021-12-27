@@ -985,6 +985,13 @@ void clientAcceptHandler(connection *conn) {
      * is no password set, nor a specific interface is bound, we don't accept
      * requests from non loopback interfaces. Instead we try to explain the
      * user what to do to fix it if needed. */
+
+    /**
+      * 如果服务器在保护模式下运行（默认）并且
+      * 没有设置密码，也没有绑定特定的接口，我们不接受
+      * 来自非环回接口的请求。 相反，我们试图解释
+      * 如果需要，用户如何修复它。
+      */
     if (server.protected_mode &&
         server.bindaddr_count == 0 &&
         DefaultUser->flags & USER_FLAG_NOPASS &&
@@ -1092,6 +1099,16 @@ static void acceptCommonHandler(connection *conn, int flags, char *ip) {
      *
      * Because of that, we must do nothing else afterwards.
      */
+    /**
+      * 发起接受。
+      *
+      * 注意 connAccept() 在这里可以自由地做两件事：
+      * 1.立即调用clientAcceptHandler()；
+      * 2. 安排将来对clientAcceptHandler() 的调用。
+      *
+      * 正因为如此，我们之后什么都不要做。
+      */
+
     if (connAccept(conn, clientAcceptHandler) == C_ERR) {
         char conninfo[100];
         if (connGetState(conn) == CONN_STATE_ERROR)

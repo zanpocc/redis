@@ -48,6 +48,14 @@
 
 /* Include the best multiplexing layer supported by this system.
  * The following should be ordered by performances, descending. */
+
+// Redis的网络模型选择：
+
+// 1、Solaris：evport
+// 2、Linux: epoll
+// 3、OS X,FreeBSD -> kqueue
+// 4、select：通常以fallback形式安装在所有平台上
+
 #ifdef HAVE_EVPORT
 #include "ae_evport.c"
 #else
@@ -84,6 +92,8 @@ aeEventLoop *aeCreateEventLoop(int setsize) {
     if (aeApiCreate(eventLoop) == -1) goto err;
     /* Events with mask == AE_NONE are not set. So let's initialize the
      * vector with it. */
+
+    // 初始化每个event的监听事件为空
     for (i = 0; i < setsize; i++)
         eventLoop->events[i].mask = AE_NONE;
     return eventLoop;
@@ -154,21 +164,38 @@ void aeStop(aeEventLoop *eventLoop) {
     eventLoop->stop = 1;
 }
 
+/**
+ * 将文件描述符加入到待监听的event中
+ *
+ * @param eventLoop  事件循环结构
+ * @param fd         文件描述符
+ * @param mask       事件掩码,待监听的event
+ * @param proc       处理handle
+ * @param clientData 客户端数据
+ */
 int aeCreateFileEvent(aeEventLoop *eventLoop, int fd, int mask,
         aeFileProc *proc, void *clientData)
 {
+    // fd大小不能大于客户端最大连接数
     if (fd >= eventLoop->setsize) {
         errno = ERANGE;
         return AE_ERR;
     }
+
+    // fe存放在对应的fd的数组中
     aeFileEvent *fe = &eventLoop->events[fd];
 
+    // 关键代码，设置fd的监听事件
     if (aeApiAddEvent(eventLoop, fd, mask) == -1)
         return AE_ERR;
+
+    // 添加handler,读事件handler或者写事件handler
     fe->mask |= mask;
     if (mask & AE_READABLE) fe->rfileProc = proc;
     if (mask & AE_WRITABLE) fe->wfileProc = proc;
     fe->clientData = clientData;
+
+    // 更新最大文件描述符
     if (fd > eventLoop->maxfd)
         eventLoop->maxfd = fd;
     return AE_OK;
@@ -345,6 +372,10 @@ static int processTimeEvents(aeEventLoop *eventLoop) {
  * if flags has AE_CALL_BEFORE_SLEEP set, the beforesleep callback is called.
  *
  * The function returns the number of events processed. */
+
+/**
+ * 事件循环函数
+ */
 int aeProcessEvents(aeEventLoop *eventLoop, int flags)
 {
     int processed = 0, numevents;
@@ -392,7 +423,7 @@ int aeProcessEvents(aeEventLoop *eventLoop, int flags)
 
         /* Call the multiplexing API, will return only on timeout or when
          * some event fires. */
-        numevents = aeApiPoll(eventLoop, tvp);
+        numevents = aeApiPoll(eventLoop, tvp); // 开始调用epoll_wait函数等待事件
 
         /* After sleep callback. */
         if (eventLoop->aftersleep != NULL && flags & AE_CALL_AFTER_SLEEP)
@@ -481,6 +512,9 @@ int aeWait(int fd, int mask, long long milliseconds) {
     }
 }
 
+/**
+ * 事件循环
+ */
 void aeMain(aeEventLoop *eventLoop) {
     eventLoop->stop = 0;
     while (!eventLoop->stop) {

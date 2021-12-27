@@ -71,19 +71,32 @@ static void aeApiFree(aeEventLoop *eventLoop) {
     zfree(state);
 }
 
+/**
+ * 往事件循环中加入fd，监控相关事件
+ */
 static int aeApiAddEvent(aeEventLoop *eventLoop, int fd, int mask) {
+
     aeApiState *state = eventLoop->apidata;
+
+    // 转换eventLoop中的event结构为epoll的event结构
     struct epoll_event ee = {0}; /* avoid valgrind warning */
     /* If the fd was already monitored for some event, we need a MOD
      * operation. Otherwise we need an ADD operation. */
+    /**
+     * 如果 fd 已经针对某个事件进行了监控，我们需要一个 MOD
+     * 操作。 否则我们需要一个 ADD 操作
+     */
     int op = eventLoop->events[fd].mask == AE_NONE ?
             EPOLL_CTL_ADD : EPOLL_CTL_MOD;
 
     ee.events = 0;
     mask |= eventLoop->events[fd].mask; /* Merge old events */
+
+    // 监听读或者写事件
     if (mask & AE_READABLE) ee.events |= EPOLLIN;
     if (mask & AE_WRITABLE) ee.events |= EPOLLOUT;
     ee.data.fd = fd;
+    // 设置的fd的监听事件
     if (epoll_ctl(state->epfd,op,fd,&ee) == -1) return -1;
     return 0;
 }
