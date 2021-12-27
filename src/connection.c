@@ -95,7 +95,7 @@ connection *connCreateSocket() {
 connection *connCreateAcceptedSocket(int fd) {
     connection *conn = connCreateSocket();
     conn->fd = fd;
-    conn->state = CONN_STATE_ACCEPTING;
+    conn->state = CONN_STATE_ACCEPTING; // connection的read
     return conn;
 }
 
@@ -242,6 +242,7 @@ static int connSocketSetReadHandler(connection *conn, ConnectionCallbackFunc fun
     if (!conn->read_handler)
         aeDeleteFileEvent(server.el,conn->fd,AE_READABLE);
     else
+        // 给已建立的连接添加ReadHandler
         if (aeCreateFileEvent(server.el,conn->fd,
                     AE_READABLE,conn->type->ae_handler,conn) == AE_ERR) return C_ERR;
     return C_OK;

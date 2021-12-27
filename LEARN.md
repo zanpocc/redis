@@ -8,6 +8,7 @@ initServer server.c:3184
 main server.c:6315
 ~~~
 
+
 事件循环流程调用堆栈：
 ~~~stack
 anetTcpAccept anet.c:515
@@ -33,9 +34,20 @@ aeApiAddEvent ae_epoll.c:82
 aeCreateFileEvent ae.c:189
 connSocketSetReadHandler connection.c:245
 connSetReadHandler connection.h:166
-createClient networking.c:122
+createClient networking.c:122 // conn已经有了type属性
 acceptCommonHandler networking.c:1082
 acceptTcpHandler networking.c:1140 // 监听socket处理器
+aeProcessEvents ae.c:458
+aeMain ae.c:521
+main server.c:6437
+~~~
+
+
+创建conn对象调用堆栈：
+~~~stack
+connCreateSocket connection.c:79
+connCreateAcceptedSocket connection.c:96
+acceptTcpHandler networking.c:1146
 aeProcessEvents ae.c:458
 aeMain ae.c:521
 main server.c:6437

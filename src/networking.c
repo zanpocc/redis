@@ -114,12 +114,18 @@ client *createClient(connection *conn) {
      * This is useful since all the commands needs to be executed
      * in the context of a client. When commands are executed in other
      * contexts (for instance a Lua script) we need a non connected client. */
+    /**
+      * 将 NULL 作为 conn 传递可以创建非连接的客户端。
+      * 这很有用，因为所有命令都需要执行
+      * 在客户端的上下文中。 当命令在其他地方执行时
+      * 上下文（例如 Lua 脚本）我们需要一个非连接的客户端。
+      */
     if (conn) {
         connNonBlock(conn);
         connEnableTcpNoDelay(conn);
         if (server.tcpkeepalive)
             connKeepAlive(conn,server.tcpkeepalive);
-        connSetReadHandler(conn, readQueryFromClient);
+        connSetReadHandler(conn, readQueryFromClient); // 建立的连接添加读处理器handler,connSocketSetReadHandler connection.c
         connSetPrivateData(conn, c);
     }
 
@@ -1078,7 +1084,7 @@ static void acceptCommonHandler(connection *conn, int flags, char *ip) {
         return;
     }
 
-    /* Create connection and client */
+    /* 创建连接和客户端 */
     if ((c = createClient(conn)) == NULL) {
         serverLog(LL_WARNING,
             "Error registering fd event for the new client: %s (conn: %s)",
@@ -1137,7 +1143,7 @@ void acceptTcpHandler(aeEventLoop *el, int fd, void *privdata, int mask) {
         }
         anetCloexec(cfd);
         serverLog(LL_VERBOSE,"Accepted %s:%d", cip, cport);
-        acceptCommonHandler(connCreateAcceptedSocket(cfd),0,cip);
+        acceptCommonHandler(connCreateAcceptedSocket(cfd),0,cip); // 这里新建connection对象，里面包含了readHandler
     }
 }
 
