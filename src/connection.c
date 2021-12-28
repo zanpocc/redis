@@ -244,7 +244,8 @@ static int connSocketSetReadHandler(connection *conn, ConnectionCallbackFunc fun
     else
         // 给已建立的连接添加ReadHandler
         if (aeCreateFileEvent(server.el,conn->fd,
-                    AE_READABLE,conn->type->ae_handler,conn) == AE_ERR) return C_ERR;
+                    AE_READABLE,conn->type->ae_handler,c
+                    onn) == AE_ERR) return C_ERR;
     return C_OK;
 }
 

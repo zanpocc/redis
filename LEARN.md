@@ -1,4 +1,4 @@
-## 网络流程
+## 网络模型关键调用堆栈
 
 网络模型相关数据结构初始化调用堆栈：
 ~~~stack
@@ -52,3 +52,39 @@ aeProcessEvents ae.c:458
 aeMain ae.c:521
 main server.c:6437
 ~~~
+
+
+## 关键结构和流程定义
+事件循环结构:
+~~~c
+aeEventLoop:
+aeFileEvent[maxClient+other] events; /* 已经注册的事件,fd的值是作为索引下标 */
+aeFiredEvent[maxClient+other] fired; /* 触发事件 */
+
+// 已经注册事件
+typedef struct aeFileEvent {
+    int mask; /* 注册的事件：读或者写 */
+    aeFileProc *rfileProc; /* 读事件发生时回调 */
+    aeFileProc *wfileProc; /* 写事件发生时回调 */
+    void *clientData; /* 客户端附加数据 */
+} aeFileEvent;
+
+// 触发事件
+typedef struct aeFiredEvent {
+    int fd; // 触发事件的文件描述符
+    int mask; // 触发的事件类型：读或者写
+} aeFiredEvent;
+
+
+// 添加注册事件,将指定的fd加入到事件监听中
+int aeCreateFileEvent(aeEventLoop *eventLoop, int fd, int mask,
+        aeFileProc *proc, void *clientData);
+
+// 事件循环,等待事件触发,执行事件数组
+int aeProcessEvents(aeEventLoop *eventLoop, int flags);
+
+// 设置firedEvent,事件来到之后设置fired数组(触发事件数组)
+static int aeApiPoll(aeEventLoop *eventLoop, struct timeval *tvp);
+
+~~~
+
