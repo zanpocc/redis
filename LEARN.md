@@ -61,6 +61,7 @@ aeEventLoop:
 aeFileEvent[maxClient+other] events; /* 已经注册的事件,fd的值是作为索引下标 */
 aeFiredEvent[maxClient+other] fired; /* 触发事件 */
 
+
 // 已经注册事件
 typedef struct aeFileEvent {
     int mask; /* 注册的事件：读或者写 */
@@ -68,6 +69,7 @@ typedef struct aeFileEvent {
     aeFileProc *wfileProc; /* 写事件发生时回调 */
     void *clientData; /* 客户端附加数据 */
 } aeFileEvent;
+
 
 // 触发事件
 typedef struct aeFiredEvent {
@@ -80,11 +82,25 @@ typedef struct aeFiredEvent {
 int aeCreateFileEvent(aeEventLoop *eventLoop, int fd, int mask,
         aeFileProc *proc, void *clientData);
 
+
 // 事件循环,等待事件触发,执行事件数组
 int aeProcessEvents(aeEventLoop *eventLoop, int flags);
 
+
 // 设置firedEvent,事件来到之后设置fired数组(触发事件数组)
 static int aeApiPoll(aeEventLoop *eventLoop, struct timeval *tvp);
+
+
+// 监听连接Handler
+void acceptTcpHandler(aeEventLoop *el, int fd, void *privdata, int mask);
+
+
+// 监听命令到来Handler
+void readQueryFromClient(connection *conn);
+
+
+// 多IO线程处理解析参数和写出结果事件,在void initThreadedIO(void)处初始化
+void *IOThreadMain(void *myid);
 
 ~~~
 

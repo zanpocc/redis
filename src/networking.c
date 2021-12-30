@@ -3464,6 +3464,8 @@ void *IOThreadMain(void *myid) {
         listIter li;
         listNode *ln;
         listRewind(io_threads_list[id],&li);
+
+        // 多线程应用：Redis的IO线程主要做解析客户端命令和向客户端写结果这些操作
         while((ln = listNext(&li))) {
             client *c = listNodeValue(ln);
             if (io_threads_op == IO_THREADS_OP_WRITE) {
